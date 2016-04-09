@@ -3,7 +3,7 @@ from six import PY3
 from twisted.web.resource import NoResource, IResource
 from twisted.web.server import NOT_DONE_YET
 from zope.interface import implementer
-from orbit.transaction import WebSocketConnection
+from nydus.transaction import WebSocketConnection
 
 @implementer(IResource)
 class WebSocketResource(object):

@@ -1,0 +1,7 @@
+A more practical interface built on top of Autobahn, a Twisted websocket library.
+
+A "Transaction" is essentially a data container with a list of client websockets that are interested in that data, which you can communicate with. You write one or more protocols to interact with that data, and they're added to the Transaction object as connections are received.
+
+This lets you model the way WebSockets are frequently used. A real-world code example from a website's Shoutbox code is included, though not all code is included since it's application specific. One single Transaction is used to serve shout data to all connected clients, but more Transactions could be instantiated for separate shoutboxes if that was desired. To do so, replace the static lambda in main.py with a TransactionManager.
+
+Many more examples of websocket use that are easily modeled this way exist. For instance, a user who initiates some kind of long running task, like sending a mass email. Perhaps he closes his tab, or someone else wants to view the status of the task. The first user can come back to it, or the new user can join and look. Even if there are 0 listeners, the data is still there because the task is still running. This kind of design is now very easily modeled by isolating data from the users who care about the data. This resembles the MVC pattern.
