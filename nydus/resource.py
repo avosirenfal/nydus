@@ -23,6 +23,11 @@ class WebSocketResource(object):
 		:type keyword: string or None
 		"""
 		self._factory = WebSocketServerFactory(url)
+		
+		# disable autobahn http response for when someone hits websocket URI with no upgrade header
+		# we just want to reject them with HTTP STATUS 426 (Need Upgrade)
+		self._factory.setProtocolOptions(webStatus=False)
+		
 		self._factory.protocol = WebSocketConnection
 		self.lookup = lookup
 		self.keyword = keyword
