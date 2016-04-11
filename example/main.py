@@ -24,6 +24,13 @@ import msgpack as json
 from protocol import ShoutboxWSProtocol
 from util import SimpleSerializable, Serializer
 
+# all imports for flask
+from twisted.internet import reactor
+from twisted.web.server import Site
+from twisted.web.wsgi import WSGIResource
+from flask import Flask
+from autobahn.twisted.resource import WSGIRootResource
+
 class ShoutboxTransaction(Transaction):
 	def initialize(self):
 		self.env = Environment(loader=FileSystemLoader('templates'), autoescape=True)
@@ -61,21 +68,52 @@ class ShoutboxTransaction(Transaction):
 				continue
 
 			proto.write(connection, msg, raw=raw)
+			
+# whether we want a websocket thing and flask running under twisted, this is to show both initialization techniques
+flask = False
 
-if(__name__ == '__main__'):
+if(__name__ == '__main__' flask):
 	log.startLogging(sys.stdout)
+	
+	if(not flask):
+		chatstate = ShoutboxTransaction(ShoutboxWSProtocol)
+		# a TransactionManager is used when you might have multiple Transactions which can all be served over the same websocket URI
+		# they're looked up based on a GET parameter in the URL, a unique key for each transaction
+		#
+		# here we use a static transaction, if you wanted to use TransactionManager instead:
+		#
+		# tm = TransactionManager(chatstate)
+		# resource = WebSocketResource('wss://somesite.com/shoutboxws', tm)
+		resource = WebSocketResource('wss://somesite.com/shoutboxws', lambda x: chatstate)
 
-	chatstate = ShoutboxTransaction(ShoutboxWSProtocol)
-	# static transaction, use TransactionManager instead
-	# tm = TransactionManager(chatstate)
-	# resource = WebSocketResource('wss://somesite.com/shoutboxws', tm)
-	resource = WebSocketResource('wss://somesite.com/shoutboxws', lambda x: chatstate)
+		root = Resource()
+		root.putChild("shoutboxws", resource)
 
-	root = Resource()
-	root.putChild("shoutboxws", resource)
+		site = Site(root)
 
-	site = Site(root)
+		reactor.listenTCP(12500, site, interface='0.0.0.0')
+		#reactor.listenSSL(12500, site, DefaultOpenSSLContextFactory('/home/shoutbox/keys/privkey1.pem', '/home/shoutbox/keys/fullchain1.pem', SSL.TLSv1_2_METHOD))
+		reactor.run()
+	else:
+		app = Flask(__name__)
+		# ... flask setup
 
-	reactor.listenTCP(12500, site, interface='0.0.0.0')
-	#reactor.listenSSL(12500, site, DefaultOpenSSLContextFactory('/home/shoutbox/keys/privkey1.pem', '/home/shoutbox/keys/fullchain1.pem', SSL.TLSv1_2_METHOD))
-	reactor.run()
+		chatstate = ShoutboxTransaction(ShoutboxWSProtocol)
+		# a TransactionManager is used when you might have multiple Transactions which can all be served over the same websocket URI
+		# they're looked up based on a GET parameter in the URL, a unique key for each transaction
+		#
+		# here we use a static transaction, if you wanted to use TransactionManager instead:
+		#
+		# tm = TransactionManager(chatstate)
+		# resource = WebSocketResource('wss://somesite.com/shoutboxws', tm)
+		shoutbox_resource = WebSocketResource('wss://somesite.com/shoutboxws', lambda x: chatstate)
+		
+		resource = WSGIRootResource(WSGIResource(reactor, reactor.getThreadPool(), app), {
+			'shoutboxws': shoutbox_resource,
+		})
+
+		site = Site(resource)
+
+		reactor.listenTCP(12500, site, interface='0.0.0.0')
+		#reactor.listenSSL(12500, site, DefaultOpenSSLContextFactory('/home/shoutbox/keys/privkey1.pem', '/home/shoutbox/keys/fullchain1.pem', SSL.TLSv1_2_METHOD))
+		reactor.run()
